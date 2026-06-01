@@ -96,34 +96,36 @@ int compress(char in[100][256],int num,char *out){
     FILE *outfp=fopen(out,"wb");
     if(!outfp) return -1;
     fwrite(&num,sizeof(int),1,outfp);
-
+    
     for(int i=0;i<num;i++){
         FILE *infp=fopen(in[i],"rb");
         if(!infp) continue;
+        //文件名
         const char *n=strrchr(in[i],'\\');
         if(!n) n=strrchr(in[i],'/');
         if(n) n++;
         else n=in[i];
+        //文件大小
         fseek(infp,0,SEEK_END);
         unsigned long long fsize=ftell(infp);
         fseek(infp,0,SEEK_SET);
-
+        //写入
         char nbuf[256]={0}; 
         strncpy(nbuf,n,255);
         fwrite(nbuf,256,1,outfp);
         fwrite(&fsize,8,1,outfp);
-
+        //频数
         unsigned long long freq[256]={0};
         unsigned char buf[4096];
         int rlen;
         while((rlen=fread(buf,1,4096,infp))>0)
             for(int j=0;j<rlen;j++) freq[buf[j]]++;
         fseek(infp,0,SEEK_SET);
-
+        
         HFMnode *root=buildtree(freq);
         HFMcode table[256]; 
         encode(root,table);
-
+        //临时文件
         FILE *tmpfp=fopen("tmp.tmp","wb");
         unsigned char byte=0; 
         int bit=0;
@@ -139,14 +141,14 @@ int compress(char in[100][256],int num,char *out){
                 }
             }
         }
-        if(bit>0) fputc(byte<<(8-bit),tmpfp);
+        if(bit>0) fputc(byte<<(8-bit),tmpfp);//补0
         fclose(tmpfp);
-
+        //读临时文件
         FILE *tmpread=fopen("tmp.tmp","rb");
         fseek(tmpread,0,SEEK_END);
         unsigned long long tmpsize=ftell(tmpread);
         fseek(tmpread,0,SEEK_SET);
-
+        //频数，编码数据
         fwrite(freq,sizeof(unsigned long long),256,outfp);
         fwrite(&tmpsize,8,1,outfp);
         while((rlen=fread(buf,1,4096,tmpread))>0)
@@ -165,21 +167,22 @@ int decompress(char *in,char *out){
     if(!infp) return -1;
     int filenum;
     fread(&filenum,sizeof(int),1,infp);
-
+    //逐文件
     for(int i=0;i<filenum;i++){
         char filename[256]={0};
         unsigned long long fsize,tmpsize;
         unsigned long long freq[256];
-
+        //文件信息
         fread(filename,256,1,infp);
         fread(&fsize,8,1,infp);
         fread(freq,sizeof(unsigned long long),256,infp);
         fread(&tmpsize,8,1,infp);
-
+        //数据提到临时文件
         FILE *tmpfp=fopen("tmp.tmp","wb");
         unsigned char buf[4096];
         int rlen;
         unsigned long long readed=0;
+        //分块读写
         while(readed<tmpsize && (rlen=fread(buf,1,4096,infp))>0){
             unsigned long long need=tmpsize-readed;
             int towrite;
@@ -190,19 +193,19 @@ int decompress(char *in,char *out){
             if(rlen>towrite) fseek(infp,towrite-rlen,SEEK_CUR);
         }
         fclose(tmpfp);
-
+        //输出路径
         char path[1024];
         if(strlen(out)==0) strcpy(path,filename);
         else sprintf(path,"%s\\%s",out,filename);
         FILE *outfp=fopen(path,"wb");
         if(!outfp) continue;
 
-        // 独立读临时文件解码
+        //读取临时文件
         FILE *tmpin=fopen("tmp.tmp","rb");
         HFMnode *root=buildtree(freq);
         HFMnode *f=root;
         unsigned long long num=0;
-        
+        //解码
         while(num<fsize && (rlen=fread(buf,1,4096,tmpin))>0){
             for(int j=0;j<rlen && num<fsize;j++){
                 unsigned char byte=buf[j];
