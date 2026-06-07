@@ -65,8 +65,52 @@ unsigned long long getsize(char *path){
     return size;
 }
 
-int main(){
+int main(int argc,char *argv[]){
     SetConsoleOutputCP(65001);//UTF-8
+    //命令行
+    if(argc>1){
+        clock_t start,end;
+        double ut;
+        //压缩
+        if(strcmp(argv[1],"-c")==0&&argc>=4){
+            char files[100][256];
+            int num=0;
+            if(strchr(argv[3],'*')) findf(argv[3],files,&num);
+            else getfile(argv[3],files,&num);
+            if(!num){
+                printf("未找到任何文件！压缩失败！\n");
+                return 1;
+            }
+            start=clock();
+            printf("正在压缩 %d 个文件到 [%s]...\n",num,argv[2]);
+            compress(files,num,argv[2]);
+            end=clock();
+            unsigned long long rsize=0,cmpsize=0;
+            for(int i=0;i<num;i++) rsize+=getsize(files[i]);
+            cmpsize=getsize(argv[2]);
+            ut=(double)(end-start)/1000;
+            printf("压缩完成！耗时：%.2f 秒，压缩比：%.2f%%\n",ut,cmpsize*100.0/rsize);
+            return 0;
+        }
+        //解压
+        else if(strcmp(argv[1],"-d")==0&&argc>=3){
+            char out[1024]={0};
+            if(argc>=4) strncpy(out,argv[3],1023);//自定义目录
+            start=clock();
+            printf("正在解压 [%s]...\n",argv[2]);
+            decompress(argv[2],out);
+            end=clock();
+            ut=(double)(end-start)/1000;
+            printf("解压完成！耗时：%.2f 秒\n",ut);
+            return 0;
+        }
+        else{
+            printf("用法：\n");
+            printf("压缩: %s -c <输出压缩包> <输入文件或通配符...>\n",argv[0]);
+            printf("解压: %s -d <压缩包> [输出目录]\n",argv[0]);
+            return 0;
+        }
+    }    
     //死循环
     int d;
     while(1){
