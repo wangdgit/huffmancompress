@@ -178,19 +178,20 @@ int decompress(char *in,char *out){
         fread(freq,sizeof(unsigned long long),256,infp);
         fread(&tmpsize,8,1,infp);
         //数据提到临时文件
+        remove("tmp.tmp");
         FILE *tmpfp=fopen("tmp.tmp","wb");
         unsigned char buf[4096];
         int rlen;
         unsigned long long readed=0;
         //分块读写
-        while(readed<tmpsize && (rlen=fread(buf,1,4096,infp))>0){
+        while(readed<tmpsize){
             unsigned long long need=tmpsize-readed;
-            int towrite;
-            if(rlen>need) towrite=need;
-            else towrite=rlen;
-            fwrite(buf,1,towrite,tmpfp); 
-            readed+=towrite;
-            if(rlen>towrite) fseek(infp,towrite-rlen,SEEK_CUR);
+            unsigned toread=4096;
+            if(need<4096) toread=need;
+            rlen=fread(buf,1,toread,infp);
+            if(rlen==0) break;
+            fwrite(buf,1,rlen,tmpfp);
+            readed+=rlen;
         }
         fclose(tmpfp);
         //输出路径
@@ -203,6 +204,12 @@ int decompress(char *in,char *out){
         //读取临时文件
         FILE *tmpin=fopen("tmp.tmp","rb");
         HFMnode *root=buildtree(freq);
+        int aaa=(root&&root->left&&!root->right);//单字符
+        if(aaa){
+            for (unsigned long long k=0;k<fsize;k++)
+                fputc(root->left->ch,outfp);
+            goto end;
+        }
         HFMnode *f=root;
         unsigned long long num=0;
         //解码
@@ -217,10 +224,12 @@ int decompress(char *in,char *out){
                         fputc(f->ch,outfp); 
                         num++; 
                         f=root;
+                        if(num>=fsize) break;
                     }
                 }
             }
         }
+        end:
         fclose(outfp); 
         fclose(tmpin); 
         freetree(root);
